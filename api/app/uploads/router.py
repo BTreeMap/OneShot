@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import logging
-import os
 import smtplib
 from email.message import EmailMessage
-from pathlib import Path
 
 from fastapi import (
     APIRouter,
@@ -24,35 +22,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
 from app.rng import new_file_id
+from app.config import OneShotSettings
 from app.uploads.models import FileMetadata, OneShotToken
 from h4ckath0n.auth.dependencies import require_admin
 from h4ckath0n.auth.models import User
 
 CHUNK_SIZE = 1024 * 1024
-LOCAL_UPLOAD_DIR = Path(os.getenv("LOCAL_UPLOAD_DIR", "./uploads"))
-ONESHOT_PUBLIC_DOMAIN = os.getenv("ONESHOT_PUBLIC_DOMAIN", "localhost:5173")
-SMTP_HOST = os.getenv("ONESHOT_SMTP_HOST", "")
-SMTP_USERNAME = os.getenv("ONESHOT_SMTP_USERNAME", "")
-SMTP_PASSWORD = os.getenv("ONESHOT_SMTP_PASSWORD", "")
-SMTP_FROM = os.getenv("ONESHOT_SMTP_FROM", "no-reply@oneshot.local")
-SMTP_USE_SSL = os.getenv("ONESHOT_SMTP_USE_SSL", "false").lower() in {
-    "1",
-    "true",
-    "yes",
-}
-SMTP_TIMEOUT_SECONDS = float(os.getenv("ONESHOT_SMTP_TIMEOUT", "10"))
+SETTINGS = OneShotSettings()
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-def _smtp_port() -> int:
-    raw = os.getenv("ONESHOT_SMTP_PORT", "587")
-    try:
-        return int(raw)
-    except ValueError:
-        logger.warning("Invalid ONESHOT_SMTP_PORT=%r; falling back to 587", raw)
-        return 587
 
 
 class CreateOneShotTokenRequest(BaseModel):
@@ -84,17 +63,17 @@ def _extract_bearer_token(authorization: str | None) -> str:
 
 
 def _oneshot_link(token_id: str) -> str:
-    return f"https://{ONESHOT_PUBLIC_DOMAIN}/oneshot#token={token_id}"
+    return f"https://{SETTINGS.public_domain}/oneshot#token={token_id}"
 
 
 async def _send_oneshot_email(target_email: str, link: str) -> bool:
-    if not SMTP_HOST:
+    if not SETTINGS.smtp_host:
         logger.warning("OneShot email dispatch skipped: ONESHOT_SMTP_HOST is not configured")
         return False
 
     message = EmailMessage()
     message["Subject"] = "Secure OneShot Upload Link"
-    message["From"] = SMTP_FROM
+    message["From"] = SETTINGS.smtp_from
     message["To"] = target_email
     message.set_content(
         (
@@ -106,28 +85,28 @@ async def _send_oneshot_email(target_email: str, link: str) -> bool:
     )
 
     try:
-        if SMTP_USE_SSL:
+        if SETTINGS.smtp_use_ssl:
             smtp_ctx = smtplib.SMTP_SSL(
-                SMTP_HOST,
-                _smtp_port(),
-                timeout=SMTP_TIMEOUT_SECONDS,
+                SETTINGS.smtp_host,
+                SETTINGS.smtp_port,
+                timeout=SETTINGS.smtp_timeout,
             )
         else:
             smtp_ctx = smtplib.SMTP(
-                SMTP_HOST,
-                _smtp_port(),
-                timeout=SMTP_TIMEOUT_SECONDS,
+                SETTINGS.smtp_host,
+                SETTINGS.smtp_port,
+                timeout=SETTINGS.smtp_timeout,
             )
 
         with smtp_ctx as smtp:
-            if not SMTP_USE_SSL:
+            if not SETTINGS.smtp_use_ssl:
                 code, _message = smtp.starttls()
                 if code not in {220, 250}:
                     raise smtplib.SMTPException(
                         f"STARTTLS handshake failed with SMTP code {code}"
                     )
-            if SMTP_USERNAME and SMTP_PASSWORD:
-                smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
+            if SETTINGS.smtp_username and SETTINGS.smtp_password:
+                smtp.login(SETTINGS.smtp_username, SETTINGS.smtp_password)
             smtp.send_message(message)
         return True
     except Exception:
@@ -177,9 +156,9 @@ async def oneshot_upload(
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or used token")
 
-    LOCAL_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    SETTINGS.local_upload_dir.mkdir(parents=True, exist_ok=True)
     file_id = new_file_id()
-    storage_path = LOCAL_UPLOAD_DIR / file_id
+    storage_path = SETTINGS.local_upload_dir / file_id
 
     size_bytes = 0
     with storage_path.open("wb") as out:
