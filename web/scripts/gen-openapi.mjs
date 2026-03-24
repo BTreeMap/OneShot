@@ -26,6 +26,7 @@ const outputTs = resolve(webDir, "src/api/openapi.ts");
 // ── Step 1: Generate OpenAPI JSON from the backend ─────────────────────────
 console.log(`→ Using uv project: ${uvProject}`);
 console.log("→ Dumping OpenAPI schema from backend…");
+let openapiDumped = false;
 try {
   execFileSync(
     "uv",
@@ -46,14 +47,24 @@ try {
       env: { ...process.env, PYTHONPATH: apiDir },
     },
   );
-} catch {
-  console.error("✗ Failed to dump OpenAPI schema from backend.");
-  process.exit(1);
+  openapiDumped = true;
+} catch (error) {
+  if (existsSync(openapiJson)) {
+    const reason = error instanceof Error ? error.message : "unknown error";
+    console.warn(`⚠ Failed to dump OpenAPI schema from backend (${reason}).`);
+    console.warn(`⚠ Reusing existing schema at ${openapiJson}`);
+  } else {
+    console.error("✗ Failed to dump OpenAPI schema from backend.");
+    process.exit(1);
+  }
 }
 
 if (!existsSync(openapiJson)) {
   console.error(`✗ Expected OpenAPI file not found: ${openapiJson}`);
   process.exit(1);
+}
+if (openapiDumped) {
+  console.log(`✓ OpenAPI schema written to ${openapiJson}`);
 }
 
 // ── Step 2: Generate TypeScript types ──────────────────────────────────────
