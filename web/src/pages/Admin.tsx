@@ -15,22 +15,16 @@ import { Shield, Users } from "lucide-react";
 import { Alert } from "../components/Alert";
 import { Input } from "../components/Input";
 import { Button } from "../components/Button";
+import { formatBytes } from "../utils/formatBytes";
 
-function formatBytes(sizeBytes: number): string {
-  if (sizeBytes >= 1024 * 1024) {
-    return `${(sizeBytes / (1024 * 1024)).toFixed(2)} MB`;
-  }
-  if (sizeBytes >= 1024) {
-    return `${(sizeBytes / 1024).toFixed(2)} KB`;
-  }
-  return `${sizeBytes} B`;
-}
-
-function tokenStatus(tokenRow: OneShotTokenAuditItem): "Used" | "Expired" | "Active" {
+function tokenStatus(
+  tokenRow: OneShotTokenAuditItem,
+  nowMs: number,
+): "Used" | "Expired" | "Active" {
   if (tokenRow.is_used) {
     return "Used";
   }
-  return new Date(tokenRow.expires_at) < new Date() ? "Expired" : "Active";
+  return new Date(tokenRow.expires_at).getTime() < nowMs ? "Expired" : "Active";
 }
 
 function statusClassName(status: "Used" | "Expired" | "Active"): string {
@@ -70,6 +64,7 @@ export function Admin() {
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const nowMs = Date.now();
 
   const fetchAuditData = useCallback(async () => {
     setIsAuditLoading(true);
@@ -272,7 +267,7 @@ export function Admin() {
                   </thead>
                   <tbody>
                     {tokens.map((tokenRow) => {
-                      const status = tokenStatus(tokenRow);
+                      const status = tokenStatus(tokenRow, nowMs);
                       return (
                         <tr key={tokenRow.id} className="border-b border-border/60">
                           <td className="py-2 pr-4 font-mono">{tokenRow.id.slice(0, 8)}…</td>

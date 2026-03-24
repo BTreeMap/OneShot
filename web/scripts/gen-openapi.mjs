@@ -49,9 +49,16 @@ try {
   );
   openapiDumped = true;
 } catch (error) {
-  if (existsSync(openapiJson)) {
-    const reason = error instanceof Error ? error.message : "unknown error";
-    console.warn(`⚠ Failed to dump OpenAPI schema from backend (${reason}).`);
+  const isMissingUv =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ENOENT";
+  const message = error instanceof Error ? error.message : "unknown error";
+  const canFallback = existsSync(openapiJson) && isMissingUv;
+
+  if (canFallback) {
+    console.warn(`⚠ Failed to dump OpenAPI schema from backend (${message}).`);
     console.warn(`⚠ Reusing existing schema at ${openapiJson}`);
   } else {
     console.error("✗ Failed to dump OpenAPI schema from backend.");
