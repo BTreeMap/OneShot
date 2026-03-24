@@ -209,3 +209,4 @@ def test_admin_file_download_sets_content_disposition_filename(tmp_path: Path) -
         assert response.status_code == 200
         assert "attachment;" in response.headers["content-disposition"]
         assert 'filename="evidence-report.pdf"' in response.headers["content-disposition"]
+
