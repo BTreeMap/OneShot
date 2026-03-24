@@ -17,6 +17,7 @@ WORKDIR /app
 
 COPY --from=builder /opt/venv /opt/venv
 COPY . .
+RUN mkdir -p /app/uploads && chown -R nobody:nogroup /app/uploads
 
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH=/app

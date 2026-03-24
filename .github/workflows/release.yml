@@ -102,12 +102,12 @@ jobs:
           echo "api_image=${API_IMAGE}" >> "$GITHUB_OUTPUT"
           echo "web_image=${WEB_IMAGE}" >> "$GITHUB_OUTPUT"
 
-          TAGS_API="${API_IMAGE}:dev,${API_IMAGE}:dev.${DATE},${API_IMAGE}:dev.${SHORT_SHA},${API_IMAGE}:dev.${DATE}.${SHORT_SHA},${API_IMAGE}:latest"
-          TAGS_WEB="${WEB_IMAGE}:dev,${WEB_IMAGE}:dev.${DATE},${WEB_IMAGE}:dev.${SHORT_SHA},${WEB_IMAGE}:dev.${DATE}.${SHORT_SHA},${WEB_IMAGE}:latest"
+          TAGS_API="${API_IMAGE}:dev,${API_IMAGE}:dev.${DATE},${API_IMAGE}:dev.${SHORT_SHA},${API_IMAGE}:dev.${DATE}.${SHORT_SHA}"
+          TAGS_WEB="${WEB_IMAGE}:dev,${WEB_IMAGE}:dev.${DATE},${WEB_IMAGE}:dev.${SHORT_SHA},${WEB_IMAGE}:dev.${DATE}.${SHORT_SHA}"
 
           if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
-            TAGS_API="${TAGS_API},${API_IMAGE}:${DATE},${API_IMAGE}:${SHORT_SHA},${API_IMAGE}:${DATE}.${SHORT_SHA},${API_IMAGE}:stable"
-            TAGS_WEB="${TAGS_WEB},${WEB_IMAGE}:${DATE},${WEB_IMAGE}:${SHORT_SHA},${WEB_IMAGE}:${DATE}.${SHORT_SHA},${WEB_IMAGE}:stable"
+            TAGS_API="${TAGS_API},${API_IMAGE}:${DATE},${API_IMAGE}:${SHORT_SHA},${API_IMAGE}:${DATE}.${SHORT_SHA},${API_IMAGE}:stable,${API_IMAGE}:latest"
+            TAGS_WEB="${TAGS_WEB},${WEB_IMAGE}:${DATE},${WEB_IMAGE}:${SHORT_SHA},${WEB_IMAGE}:${DATE}.${SHORT_SHA},${WEB_IMAGE}:stable,${WEB_IMAGE}:latest"
           fi
 
           echo "tags_api=${TAGS_API}" >> "$GITHUB_OUTPUT"
@@ -208,32 +208,12 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-  non-blocking-e2e:
+  non-blocking-e2e-sqlite:
     runs-on: ubuntu-latest
     needs: [api-tests, web-tests]
     if: always()
-    strategy:
-      fail-fast: false
-      matrix:
-        db:
-          - sqlite
-          - postgres
-    services:
-      postgres:
-        image: ${{ matrix.db == 'postgres' && 'postgres:16' || '' }}
-        env:
-          POSTGRES_USER: oneshot
-          POSTGRES_PASSWORD: oneshot
-          POSTGRES_DB: oneshot_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U oneshot"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=10
     env:
-      H4CKATH0N_DATABASE_URL: ${{ matrix.db == 'postgres' && 'postgresql+asyncpg://oneshot:oneshot@localhost:5432/oneshot_test' || 'sqlite+aiosqlite:///./data/test.db' }}
+      H4CKATH0N_DATABASE_URL: sqlite+aiosqlite:///./data/test.db
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
@@ -259,7 +239,57 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-release-report-${{ matrix.db }}
+          name: playwright-release-report-sqlite
+          path: |
+            web/playwright-report/
+            web/test-results/
+
+  non-blocking-e2e-postgres:
+    runs-on: ubuntu-latest
+    needs: [api-tests, web-tests]
+    if: always()
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: oneshot
+          POSTGRES_PASSWORD: oneshot
+          POSTGRES_DB: oneshot_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U oneshot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      H4CKATH0N_DATABASE_URL: postgresql+asyncpg://oneshot:oneshot@localhost:5432/oneshot_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install backend dependencies
+        working-directory: api
+        run: uv sync
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+      - name: Install Playwright browser
+        working-directory: web
+        run: npx playwright install chromium
+      - name: Run E2E tests (non-blocking)
+        working-directory: web
+        run: npx playwright test
+        continue-on-error: true
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-release-report-postgres
           path: |
             web/playwright-report/
             web/test-results/
