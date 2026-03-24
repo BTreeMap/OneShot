@@ -56,6 +56,15 @@ class OneShotTokenAuditItem(BaseModel):
     target_email: str | None
     is_used: bool
     created_at: datetime
+    expires_at: datetime
+
+
+class OneShotStatsResponse(BaseModel):
+    total_files: int
+    total_storage_bytes: int
+    tokens_issued: int
+    tokens_used: int
+    active_tokens: int
 
 
 class FileAuditItem(BaseModel):
@@ -239,9 +248,47 @@ async def list_oneshot_tokens(
             target_email=row.target_email,
             is_used=row.is_used,
             created_at=row.created_at,
+            expires_at=row.expires_at,
         )
         for row in rows
     ]
+
+
+@router.get("/admin/stats", response_model=OneShotStatsResponse)
+async def get_oneshot_stats(
+    db: AsyncSession = Depends(_db_dep),
+    _admin_user: User = require_admin(),
+) -> OneShotStatsResponse:
+    total_files = (
+        await db.execute(select(func.count(FileMetadata.id)))
+    ).scalar_one()
+    total_storage_bytes = (
+        await db.execute(select(func.coalesce(func.sum(FileMetadata.size_bytes), 0)))
+    ).scalar_one()
+    tokens_issued = (
+        await db.execute(select(func.count(OneShotToken.id)))
+    ).scalar_one()
+    tokens_used = (
+        await db.execute(
+            select(func.count(OneShotToken.id)).where(OneShotToken.is_used.is_(True))
+        )
+    ).scalar_one()
+    active_tokens = (
+        await db.execute(
+            select(func.count(OneShotToken.id)).where(
+                OneShotToken.is_used.is_(False),
+                OneShotToken.expires_at > func.now(),
+            )
+        )
+    ).scalar_one()
+
+    return OneShotStatsResponse(
+        total_files=total_files,
+        total_storage_bytes=total_storage_bytes,
+        tokens_issued=tokens_issued,
+        tokens_used=tokens_used,
+        active_tokens=active_tokens,
+    )
 
 
 @router.get("/admin/files", response_model=list[FileAuditItem])

@@ -60,6 +60,7 @@ describe("Admin", () => {
               target_email: "alice@example.com",
               is_used: true,
               created_at: "2026-03-24T00:00:00Z",
+              expires_at: "2026-03-25T00:00:00Z",
             },
           ]),
           { status: 200, headers: { "Content-Type": "application/json" } },
@@ -89,6 +90,8 @@ describe("Admin", () => {
     await waitFor(() => {
       expect(screen.getAllByText("alice@example.com")).toHaveLength(2);
     });
+    expect(screen.getByText("Used")).toBeInTheDocument();
+    expect(screen.getByText(/Expires:/)).toBeInTheDocument();
     expect(screen.getByText("report.pdf")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
   });

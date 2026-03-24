@@ -41,6 +41,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Oneshot Stats */
+        get: operations["get_oneshot_stats_api_admin_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/files/{file_id}/download": {
         parameters: {
             query?: never;
@@ -479,12 +496,30 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
             /** Id */
             id: string;
             /** Is Used */
             is_used: boolean;
             /** Target Email */
             target_email: string | null;
+        };
+        /** OneShotStatsResponse */
+        OneShotStatsResponse: {
+            /** Active Tokens */
+            active_tokens: number;
+            /** Tokens Issued */
+            tokens_issued: number;
+            /** Tokens Used */
+            tokens_used: number;
+            /** Total Files */
+            total_files: number;
+            /** Total Storage Bytes */
+            total_storage_bytes: number;
         };
         /** OneShotUploadResponse */
         OneShotUploadResponse: {
@@ -780,6 +815,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FileAuditItem"][];
+                };
+            };
+        };
+    };
+    get_oneshot_stats_api_admin_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OneShotStatsResponse"];
                 };
             };
         };
