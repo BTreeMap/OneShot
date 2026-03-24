@@ -8,6 +8,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { Settings } from "./pages/Settings";
 import { Admin } from "./pages/Admin";
 import { DemoRealtime } from "./pages/DemoRealtime";
+import { OneShotUpload } from "./pages/OneShotUpload";
 
 export function App() {
   return (
@@ -16,6 +17,7 @@ export function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/oneshot" element={<OneShotUpload />} />
         <Route
           path="/dashboard"
           element={

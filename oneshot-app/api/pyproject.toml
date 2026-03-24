@@ -6,6 +6,8 @@ requires-python = ">=3.11"
 dependencies = [
     "h4ckath0n>=0.1.9",
     "cryptography>=44.0",
+    "python-multipart>=0.0.9",
+    "pytest>=8.0.0",
 ]
 
 [project.scripts]

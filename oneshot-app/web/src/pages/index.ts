@@ -5,3 +5,4 @@ export { Dashboard } from "./Dashboard";
 export { Settings } from "./Settings";
 export { Admin } from "./Admin";
 export { DemoRealtime } from "./DemoRealtime";
+export { OneShotUpload } from "./OneShotUpload";
