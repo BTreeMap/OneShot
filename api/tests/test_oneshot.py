@@ -21,7 +21,7 @@ def test_new_file_id_format() -> None:
 def test_oneshot_token_cannot_be_reused(tmp_path: Path) -> None:
     from app.uploads import router as uploads_router
 
-    uploads_router.LOCAL_UPLOAD_DIR = tmp_path
+    uploads_router.SETTINGS.local_upload_dir = tmp_path
 
     with TestClient(app) as client:
         async def _seed() -> str:

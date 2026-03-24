@@ -5,7 +5,7 @@ import { OneShotUpload } from "../OneShotUpload";
 describe("OneShotUpload", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    window.location.hash = "#token=t1234567890123456789012345678901";
+    window.location.hash = "#token=t12345";
   });
 
   it("extracts token from hash and sends Authorization bearer header", async () => {
@@ -29,8 +29,6 @@ describe("OneShotUpload", () => {
 
     const [, init] = mockFetch.mock.calls[0]!;
     const headers = (init?.headers ?? {}) as Record<string, string>;
-    expect(headers.Authorization).toBe(
-      "Bearer t1234567890123456789012345678901",
-    );
+    expect(headers.Authorization).toBe("Bearer t12345");
   });
 });
