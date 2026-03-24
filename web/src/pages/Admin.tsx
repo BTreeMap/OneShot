@@ -18,12 +18,14 @@ export function Admin() {
   const [isLoading, setIsLoading] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const onGenerate = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setGeneratedLink(null);
     setSuccessMessage(null);
+    setErrorMessage(null);
     try {
       const response = await fetch("/api/admin/oneshot-tokens", {
         method: "POST",
@@ -33,9 +35,13 @@ export function Admin() {
       const data = (await response.json()) as {
         sent?: boolean;
         link?: string;
+        detail?: string;
       };
       if (!response.ok) {
-        throw new Error("Failed to generate one-shot link");
+        throw new Error(
+          data.detail ??
+            `Failed to generate one-shot link (status: ${response.status})`,
+        );
       }
       if (data.sent) {
         setSuccessMessage("Link successfully dispatched to user email.");
@@ -44,8 +50,12 @@ export function Admin() {
       if (data.link) {
         setGeneratedLink(data.link);
       }
-    } catch {
-      // Keep UI state unchanged on failure; generate flow can be retried.
+    } catch (e) {
+      setErrorMessage(
+        e instanceof Error
+          ? e.message
+          : "Failed to generate one-shot link. Please try again.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -97,6 +107,7 @@ export function Admin() {
         </CardHeader>
         <CardContent className="space-y-4">
           {successMessage && <Alert variant="success">{successMessage}</Alert>}
+          {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
           <form onSubmit={onGenerate} className="space-y-4">
             <Input
               id="target-email"

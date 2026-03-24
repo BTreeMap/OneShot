@@ -32,13 +32,27 @@ CHUNK_SIZE = 1024 * 1024
 LOCAL_UPLOAD_DIR = Path(os.getenv("LOCAL_UPLOAD_DIR", "./uploads"))
 ONESHOT_PUBLIC_DOMAIN = os.getenv("ONESHOT_PUBLIC_DOMAIN", "localhost:5173")
 SMTP_HOST = os.getenv("ONESHOT_SMTP_HOST", "")
-SMTP_PORT = int(os.getenv("ONESHOT_SMTP_PORT", "587"))
 SMTP_USERNAME = os.getenv("ONESHOT_SMTP_USERNAME", "")
 SMTP_PASSWORD = os.getenv("ONESHOT_SMTP_PASSWORD", "")
 SMTP_FROM = os.getenv("ONESHOT_SMTP_FROM", "no-reply@oneshot.local")
+SMTP_USE_SSL = os.getenv("ONESHOT_SMTP_USE_SSL", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+}
+SMTP_TIMEOUT_SECONDS = float(os.getenv("ONESHOT_SMTP_TIMEOUT", "10"))
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _smtp_port() -> int:
+    raw = os.getenv("ONESHOT_SMTP_PORT", "587")
+    try:
+        return int(raw)
+    except ValueError:
+        logger.warning("Invalid ONESHOT_SMTP_PORT=%r; falling back to 587", raw)
+        return 587
 
 
 class CreateOneShotTokenRequest(BaseModel):
@@ -73,10 +87,10 @@ def _oneshot_link(token_id: str) -> str:
     return f"https://{ONESHOT_PUBLIC_DOMAIN}/oneshot#token={token_id}"
 
 
-async def _send_oneshot_email(target_email: str, link: str) -> None:
+async def _send_oneshot_email(target_email: str, link: str) -> bool:
     if not SMTP_HOST:
         logger.warning("OneShot email dispatch skipped: ONESHOT_SMTP_HOST is not configured")
-        return
+        return False
 
     message = EmailMessage()
     message["Subject"] = "Secure OneShot Upload Link"
@@ -92,13 +106,33 @@ async def _send_oneshot_email(target_email: str, link: str) -> None:
     )
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as smtp:
-            smtp.starttls()
+        if SMTP_USE_SSL:
+            smtp_ctx = smtplib.SMTP_SSL(
+                SMTP_HOST,
+                _smtp_port(),
+                timeout=SMTP_TIMEOUT_SECONDS,
+            )
+        else:
+            smtp_ctx = smtplib.SMTP(
+                SMTP_HOST,
+                _smtp_port(),
+                timeout=SMTP_TIMEOUT_SECONDS,
+            )
+
+        with smtp_ctx as smtp:
+            if not SMTP_USE_SSL:
+                code, _message = smtp.starttls()
+                if code not in {220, 250}:
+                    raise smtplib.SMTPException(
+                        f"STARTTLS handshake failed with SMTP code {code}"
+                    )
             if SMTP_USERNAME and SMTP_PASSWORD:
                 smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
             smtp.send_message(message)
+        return True
     except Exception:
         logger.exception("Failed to dispatch OneShot email to %s", target_email)
+        return False
 
 
 @router.post(
