@@ -86,7 +86,7 @@ describe("Admin", () => {
     fireEvent.click(screen.getByRole("button", { name: "Audit Logs" }));
 
     expect(await screen.findByText("Token History")).toBeInTheDocument();
-    expect(screen.getByText("alice@example.com")).toBeInTheDocument();
+    expect(screen.getAllByText("alice@example.com")).toHaveLength(2);
     expect(screen.getByText("report.pdf")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
   });

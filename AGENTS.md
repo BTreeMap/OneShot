@@ -58,3 +58,11 @@ You are expected to execute these commands in your workspace terminal to verify 
 2. **Test-Driven:** Write `pytest` or `vitest` tests for your new logic *before* or alongside the implementation.
 3. **Adversarial Testing:** When writing security or token logic, write tests that specifically attempt to bypass the mechanism (e.g., concurrent requests, invalid headers).
 4. **Self-Correction:** Run the formatters, linters, and test suites. If a test fails, read the error output and fix your code autonomously. Do not submit a Pull Request with failing tests.
+
+## 6. OpenAPI Contract (MANDATORY)
+- The backend OpenAPI schema is the **single source of truth** for frontend API types.
+- Do not handwrite request/response interfaces for backend routes when generated OpenAPI types exist.
+- Regenerate schema and TS types whenever backend API shapes change:
+  - `cd web && npm run gen`
+- Import route/schema types from `web/src/api/openapi.ts` (or curated exports in `web/src/api/types.ts`) and use them directly in page/service code.
+- Keep compile-time route assertions in `web/src/api/types.ts` up to date for newly added endpoints so type drift is caught by TypeScript.

@@ -37,6 +37,12 @@ export type EchoRequest = components["schemas"]["EchoRequest"];
 /** Response body for POST /demo/echo */
 export type EchoResponse = components["schemas"]["EchoResponse"];
 
+/** Item body for GET /api/admin/oneshot-tokens */
+export type OneShotTokenAuditItem = components["schemas"]["OneShotTokenAuditItem"];
+
+/** Item body for GET /api/admin/files */
+export type FileAuditItem = components["schemas"]["FileAuditItem"];
+
 // ── Path-level assertions (ensure routes exist in the schema) ─────────────
 
 type _AssertPasskeysGet = paths["/auth/passkeys"]["get"];
@@ -44,6 +50,9 @@ type _AssertPasskeysPatch = paths["/auth/passkeys/{key_id}"]["patch"];
 type _AssertDemoEchoPost = paths["/demo/echo"]["post"];
 type _AssertDemoPingGet = paths["/demo/ping"]["get"];
 type _AssertDemoSseGet = paths["/demo/sse"]["get"];
+type _AssertAdminOneShotTokensGet = paths["/api/admin/oneshot-tokens"]["get"];
+type _AssertAdminFilesGet = paths["/api/admin/files"]["get"];
+type _AssertAdminFileDownloadGet = paths["/api/admin/files/{file_id}/download"]["get"];
 
 // Suppress "declared but never read" – they exist purely for the type check.
 export type {
@@ -52,4 +61,7 @@ export type {
   _AssertDemoEchoPost,
   _AssertDemoPingGet,
   _AssertDemoSseGet,
+  _AssertAdminOneShotTokensGet,
+  _AssertAdminFilesGet,
+  _AssertAdminFileDownloadGet,
 };

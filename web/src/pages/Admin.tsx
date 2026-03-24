@@ -1,5 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getOrMintToken, useAuth } from "../auth";
+import type {
+  FileAuditItem,
+  OneShotTokenAuditItem,
+} from "../api/types";
 import {
   Card,
   CardContent,
@@ -11,22 +15,6 @@ import { Shield, Users } from "lucide-react";
 import { Alert } from "../components/Alert";
 import { Input } from "../components/Input";
 import { Button } from "../components/Button";
-
-interface TokenAuditItem {
-  id: string;
-  target_email: string | null;
-  is_used: boolean;
-  created_at: string;
-}
-
-interface FileAuditItem {
-  id: string;
-  original_filename: string;
-  mime_type: string;
-  size_bytes: number;
-  created_at: string;
-  target_email: string | null;
-}
 
 function formatBytes(sizeBytes: number): string {
   if (sizeBytes >= 1024 * 1024) {
@@ -60,7 +48,7 @@ export function Admin() {
   const [isLoading, setIsLoading] = useState(false);
   const [isAuditLoading, setIsAuditLoading] = useState(false);
   const [activeSection, setActiveSection] = useState<"issue" | "audit">("issue");
-  const [tokens, setTokens] = useState<TokenAuditItem[]>([]);
+  const [tokens, setTokens] = useState<OneShotTokenAuditItem[]>([]);
   const [files, setFiles] = useState<FileAuditItem[]>([]);
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -84,7 +72,7 @@ export function Admin() {
       if (!filesResponse.ok) {
         throw new Error(`Failed to load files (status: ${filesResponse.status})`);
       }
-      const tokenData = (await tokensResponse.json()) as TokenAuditItem[];
+      const tokenData = (await tokensResponse.json()) as OneShotTokenAuditItem[];
       const fileData = (await filesResponse.json()) as FileAuditItem[];
       setTokens(tokenData);
       setFiles(fileData);

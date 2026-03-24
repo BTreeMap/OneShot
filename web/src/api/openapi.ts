@@ -24,6 +24,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Uploaded Files */
+        get: operations["list_uploaded_files_api_admin_files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/files/{file_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download File */
+        get: operations["download_file_api_admin_files__file_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/oneshot-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Oneshot Tokens */
+        get: operations["list_oneshot_tokens_api_admin_oneshot_tokens_get"];
+        put?: never;
+        /** Create Oneshot Token */
+        post: operations["create_oneshot_token_api_admin_oneshot_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/oneshot/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Oneshot Upload */
+        post: operations["oneshot_upload_api_oneshot_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/passkey/add/finish": {
         parameters: {
             query?: never;
@@ -308,6 +377,28 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Body_oneshot_upload_api_oneshot_upload_post */
+        Body_oneshot_upload_api_oneshot_upload_post: {
+            /** File */
+            file: string;
+        };
+        /** CreateOneShotTokenRequest */
+        CreateOneShotTokenRequest: {
+            /** Target Email */
+            target_email?: string | null;
+        };
+        /** CreateOneShotTokenResponse */
+        CreateOneShotTokenResponse: {
+            /** Link */
+            link?: string | null;
+            /**
+             * Sent
+             * @default false
+             */
+            sent: boolean;
+            /** Token Id */
+            token_id: string;
+        };
         /** EchoRequest */
         EchoRequest: {
             /**
@@ -342,6 +433,24 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** FileAuditItem */
+        FileAuditItem: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Mime Type */
+            mime_type: string;
+            /** Original Filename */
+            original_filename: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Target Email */
+            target_email: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -362,6 +471,25 @@ export interface components {
              * @description Health check status.
              */
             status: string;
+        };
+        /** OneShotTokenAuditItem */
+        OneShotTokenAuditItem: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Is Used */
+            is_used: boolean;
+            /** Target Email */
+            target_email: string | null;
+        };
+        /** OneShotUploadResponse */
+        OneShotUploadResponse: {
+            /** File Id */
+            file_id: string;
         };
         /** PasskeyAddFinishRequest */
         PasskeyAddFinishRequest: {
@@ -632,6 +760,145 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RootResponse"];
+                };
+            };
+        };
+    };
+    list_uploaded_files_api_admin_files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileAuditItem"][];
+                };
+            };
+        };
+    };
+    download_file_api_admin_files__file_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_oneshot_tokens_api_admin_oneshot_tokens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OneShotTokenAuditItem"][];
+                };
+            };
+        };
+    };
+    create_oneshot_token_api_admin_oneshot_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOneShotTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateOneShotTokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oneshot_upload_api_oneshot_upload_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_oneshot_upload_api_oneshot_upload_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OneShotUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
