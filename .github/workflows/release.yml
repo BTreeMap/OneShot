@@ -1,24 +1,10 @@
 name: Release
-
 on:
-  push:
-    branches:
-      - main
-      - release
   release:
     types: [published]
-  workflow_dispatch:
-
-concurrency:
-  group: release
-  cancel-in-progress: false
-
-permissions:
-  contents: read
-  packages: write
 
 jobs:
-  api-tests:
+  test:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -34,262 +20,64 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10
-    defaults:
-      run:
-        working-directory: api
     env:
       H4CKATH0N_DATABASE_URL: postgresql+asyncpg://oneshot:oneshot@localhost:5432/oneshot_test
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
-      - run: uv sync
-      - run: uv run pytest
-
-  web-tests:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - run: npm ci
-      - run: npm run test
-
-  package-frontend:
-    runs-on: ubuntu-latest
-    needs: [api-tests, web-tests]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - name: Build and package frontend
-        run: bash scripts/ci/package_frontend.sh
-      - name: Upload frontend artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: web/frontend.tar.xz
-
-  compute-tags:
-    runs-on: ubuntu-latest
-    needs: [api-tests, web-tests]
-    outputs:
-      api_image: ${{ steps.tags.outputs.api_image }}
-      web_image: ${{ steps.tags.outputs.web_image }}
-      tags_api: ${{ steps.tags.outputs.tags_api }}
-      tags_web: ${{ steps.tags.outputs.tags_web }}
-    steps:
-      - name: Compute lowercase image names and tags
-        id: tags
-        shell: bash
+      - name: Run backend tests
+        working-directory: api
         run: |
-          REPO_LC="${GITHUB_REPOSITORY,,}"
-          DATE="$(date -u +%Y%m%d)"
-          SHORT_SHA="${GITHUB_SHA::7}"
+          uv sync
+          uv run pytest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Run frontend tests
+        working-directory: web
+        run: |
+          npm ci
+          npm run test
 
-          BASE_IMAGE="ghcr.io/${REPO_LC}"
-          API_IMAGE="${BASE_IMAGE}-api"
-          WEB_IMAGE="${BASE_IMAGE}-web"
-
-          echo "api_image=${API_IMAGE}" >> "$GITHUB_OUTPUT"
-          echo "web_image=${WEB_IMAGE}" >> "$GITHUB_OUTPUT"
-
-          TAGS_API="${API_IMAGE}:dev,${API_IMAGE}:dev.${DATE},${API_IMAGE}:dev.${SHORT_SHA},${API_IMAGE}:dev.${DATE}.${SHORT_SHA}"
-          TAGS_WEB="${WEB_IMAGE}:dev,${WEB_IMAGE}:dev.${DATE},${WEB_IMAGE}:dev.${SHORT_SHA},${WEB_IMAGE}:dev.${DATE}.${SHORT_SHA}"
-
-          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
-            TAGS_API="${TAGS_API},${API_IMAGE}:${DATE},${API_IMAGE}:${SHORT_SHA},${API_IMAGE}:${DATE}.${SHORT_SHA},${API_IMAGE}:stable,${API_IMAGE}:latest"
-            TAGS_WEB="${TAGS_WEB},${WEB_IMAGE}:${DATE},${WEB_IMAGE}:${SHORT_SHA},${WEB_IMAGE}:${DATE}.${SHORT_SHA},${WEB_IMAGE}:stable,${WEB_IMAGE}:latest"
-          fi
-
-          echo "tags_api=${TAGS_API}" >> "$GITHUB_OUTPUT"
-          echo "tags_web=${TAGS_WEB}" >> "$GITHUB_OUTPUT"
-
-  build-push-api:
+  build-and-publish:
     runs-on: ubuntu-latest
-    needs: [compute-tags]
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
+    needs: test
+    permissions:
+      contents: write
+      packages: write
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Package frontend artifact
+        run: ./scripts/ci/package_frontend.sh
+      - name: Upload Frontend Tarball to Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ github.event.release.tag_name }} frontend.tar.xz
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push API image (dev tags)
-        id: build
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push Backend API image
         uses: docker/build-push-action@v6
         with:
           context: ./api
           file: ./api/Dockerfile
           push: true
-          tags: ${{ needs.compute-tags.outputs.tags_api }}
-
-  build-push-web:
-    runs-on: ubuntu-latest
-    needs: [compute-tags, package-frontend]
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-      - name: Move packaged frontend into web build context
-        run: mv frontend.tar.xz web/frontend.tar.xz
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push web image (dev tags)
-        id: build
+          tags: ghcr.io/${{ github.repository_owner }}/oneshot-api
+      - name: Build and push Frontend Caddy image
         uses: docker/build-push-action@v6
         with:
-          context: ./web
+          context: .
           file: ./web/Dockerfile
           push: true
-          tags: ${{ needs.compute-tags.outputs.tags_web }}
-
-  trivy-scan:
-    runs-on: ubuntu-latest
-    needs: [compute-tags, build-push-api, build-push-web]
-    steps:
-      - name: Trivy scan API image
-        id: trivy-api
-        continue-on-error: true
-        uses: aquasecurity/trivy-action@0.35.0
-        with:
-          image-ref: ${{ needs.compute-tags.outputs.api_image }}@${{ needs.build-push-api.outputs.digest }}
-          format: table
-          output: trivy-api.txt
-      - name: Trivy scan web image
-        id: trivy-web
-        continue-on-error: true
-        uses: aquasecurity/trivy-action@0.35.0
-        with:
-          image-ref: ${{ needs.compute-tags.outputs.web_image }}@${{ needs.build-push-web.outputs.digest }}
-          format: table
-          output: trivy-web.txt
-      - name: Publish Trivy summary
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo "## Container vulnerability scan summary"
-            echo ""
-            echo "### API image"
-            if [[ -f trivy-api.txt ]]; then
-              echo '```'
-              cat trivy-api.txt
-              echo '```'
-            else
-              echo "No report generated."
-            fi
-            echo ""
-            echo "### Web image"
-            if [[ -f trivy-web.txt ]]; then
-              echo '```'
-              cat trivy-web.txt
-              echo '```'
-            else
-              echo "No report generated."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  non-blocking-e2e-sqlite:
-    runs-on: ubuntu-latest
-    needs: [api-tests, web-tests]
-    if: always()
-    env:
-      H4CKATH0N_DATABASE_URL: sqlite+aiosqlite:///./data/test.db
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - name: Install backend dependencies
-        working-directory: api
-        run: uv sync
-      - name: Install frontend dependencies
-        working-directory: web
-        run: npm ci
-      - name: Install Playwright browser
-        working-directory: web
-        run: npx playwright install chromium
-      - name: Run E2E tests (non-blocking)
-        working-directory: web
-        run: npx playwright test
-        continue-on-error: true
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-release-report-sqlite
-          path: |
-            web/playwright-report/
-            web/test-results/
-
-  non-blocking-e2e-postgres:
-    runs-on: ubuntu-latest
-    needs: [api-tests, web-tests]
-    if: always()
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: oneshot
-          POSTGRES_PASSWORD: oneshot
-          POSTGRES_DB: oneshot_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U oneshot"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=10
-    env:
-      H4CKATH0N_DATABASE_URL: postgresql+asyncpg://oneshot:oneshot@localhost:5432/oneshot_test
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - name: Install backend dependencies
-        working-directory: api
-        run: uv sync
-      - name: Install frontend dependencies
-        working-directory: web
-        run: npm ci
-      - name: Install Playwright browser
-        working-directory: web
-        run: npx playwright install chromium
-      - name: Run E2E tests (non-blocking)
-        working-directory: web
-        run: npx playwright test
-        continue-on-error: true
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-release-report-postgres
-          path: |
-            web/playwright-report/
-            web/test-results/
+          tags: ghcr.io/${{ github.repository_owner }}/oneshot-web
