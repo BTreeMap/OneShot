@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 import smtplib
+from datetime import datetime
 from email.message import EmailMessage
+from pathlib import Path
 
 from fastapi import (
     APIRouter,
@@ -17,8 +19,9 @@ from fastapi import (
     status,
 )
 from pydantic import BaseModel
-from sqlalchemy import update
+from sqlalchemy import desc, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.responses import FileResponse
 from starlette.requests import Request
 
 from app.rng import new_file_id
@@ -46,6 +49,22 @@ class CreateOneShotTokenResponse(BaseModel):
 
 class OneShotUploadResponse(BaseModel):
     file_id: str
+
+
+class OneShotTokenAuditItem(BaseModel):
+    id: str
+    target_email: str | None
+    is_used: bool
+    created_at: datetime
+
+
+class FileAuditItem(BaseModel):
+    id: str
+    original_filename: str
+    mime_type: str
+    size_bytes: int
+    created_at: datetime
+    target_email: str | None
 
 
 async def _db_dep(request: Request):  # type: ignore[no-untyped-def]
@@ -185,3 +204,69 @@ async def oneshot_upload(
     await db.commit()
     await file.close()
     return OneShotUploadResponse(file_id=file_id)
+
+
+@router.get("/admin/oneshot-tokens", response_model=list[OneShotTokenAuditItem])
+async def list_oneshot_tokens(
+    db: AsyncSession = Depends(_db_dep),
+    _admin_user: User = require_admin(),
+) -> list[OneShotTokenAuditItem]:
+    rows = (
+        await db.execute(select(OneShotToken).order_by(desc(OneShotToken.created_at)))
+    ).scalars()
+    return [
+        OneShotTokenAuditItem(
+            id=row.id,
+            target_email=row.target_email,
+            is_used=row.is_used,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
+
+
+@router.get("/admin/files", response_model=list[FileAuditItem])
+async def list_uploaded_files(
+    db: AsyncSession = Depends(_db_dep),
+    _admin_user: User = require_admin(),
+) -> list[FileAuditItem]:
+    result = await db.execute(
+        select(FileMetadata, OneShotToken.target_email)
+        .join(OneShotToken, OneShotToken.id == FileMetadata.token_id)
+        .order_by(desc(FileMetadata.created_at))
+    )
+    return [
+        FileAuditItem(
+            id=file_row.id,
+            original_filename=file_row.original_filename,
+            mime_type=file_row.mime_type,
+            size_bytes=file_row.size_bytes,
+            created_at=file_row.created_at,
+            target_email=target_email,
+        )
+        for file_row, target_email in result.all()
+    ]
+
+
+@router.get("/admin/files/{file_id}/download")
+async def download_file(
+    file_id: str,
+    db: AsyncSession = Depends(_db_dep),
+    _admin_user: User = require_admin(),
+) -> FileResponse:
+    metadata = (
+        await db.execute(select(FileMetadata).where(FileMetadata.id == file_id))
+    ).scalar_one_or_none()
+    if metadata is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    file_path: Path = SETTINGS.local_upload_dir / metadata.id
+    if not file_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    return FileResponse(
+        path=file_path,
+        media_type=metadata.mime_type,
+        filename=metadata.original_filename,
+        content_disposition_type="attachment",
+    )

@@ -7,6 +7,7 @@ vi.mock("../../auth", () => ({
     userId: "u1",
     role: "admin",
   }),
+  getOrMintToken: vi.fn().mockResolvedValue("dev-token"),
 }));
 
 describe("Admin", () => {
@@ -46,5 +47,47 @@ describe("Admin", () => {
     expect(await screen.findByDisplayValue(link)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Copy Link" }));
     expect(writeText).toHaveBeenCalledWith(link);
+  });
+
+  it("renders audit tables with mocked API data", async () => {
+    const mockFetch = vi.spyOn(window, "fetch");
+    mockFetch
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              id: "t1234567890",
+              target_email: "alice@example.com",
+              is_used: true,
+              created_at: "2026-03-24T00:00:00Z",
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              id: "f1234567890",
+              original_filename: "report.pdf",
+              mime_type: "application/pdf",
+              size_bytes: 4096,
+              created_at: "2026-03-24T00:00:00Z",
+              target_email: "alice@example.com",
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    render(<Admin />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Audit Logs" }));
+
+    expect(await screen.findByText("Token History")).toBeInTheDocument();
+    expect(screen.getAllByText("alice@example.com")).toHaveLength(2);
+    expect(screen.getByText("report.pdf")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
   });
 });

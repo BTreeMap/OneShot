@@ -1,6 +1,66 @@
 {
   "components": {
     "schemas": {
+      "Body_oneshot_upload_api_oneshot_upload_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_oneshot_upload_api_oneshot_upload_post",
+        "type": "object"
+      },
+      "CreateOneShotTokenRequest": {
+        "properties": {
+          "target_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Email"
+          }
+        },
+        "title": "CreateOneShotTokenRequest",
+        "type": "object"
+      },
+      "CreateOneShotTokenResponse": {
+        "properties": {
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "sent": {
+            "default": false,
+            "title": "Sent",
+            "type": "boolean"
+          },
+          "token_id": {
+            "title": "Token Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token_id"
+        ],
+        "title": "CreateOneShotTokenResponse",
+        "type": "object"
+      },
       "EchoRequest": {
         "properties": {
           "message": {
@@ -60,6 +120,52 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "FileAuditItem": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "original_filename": {
+            "title": "Original Filename",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "target_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Email"
+          }
+        },
+        "required": [
+          "id",
+          "original_filename",
+          "mime_type",
+          "size_bytes",
+          "created_at",
+          "target_email"
+        ],
+        "title": "FileAuditItem",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -99,6 +205,55 @@
           "status"
         ],
         "title": "HealthzResponse",
+        "type": "object"
+      },
+      "OneShotTokenAuditItem": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_used": {
+            "title": "Is Used",
+            "type": "boolean"
+          },
+          "target_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Email"
+          }
+        },
+        "required": [
+          "id",
+          "target_email",
+          "is_used",
+          "created_at"
+        ],
+        "title": "OneShotTokenAuditItem",
+        "type": "object"
+      },
+      "OneShotUploadResponse": {
+        "properties": {
+          "file_id": {
+            "title": "File Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_id"
+        ],
+        "title": "OneShotUploadResponse",
         "type": "object"
       },
       "PasskeyAddFinishRequest": {
@@ -576,6 +731,214 @@
           }
         },
         "summary": "Welcome"
+      }
+    },
+    "/api/admin/files": {
+      "get": {
+        "operationId": "list_uploaded_files_api_admin_files_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FileAuditItem"
+                  },
+                  "title": "Response List Uploaded Files Api Admin Files Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "List Uploaded Files",
+        "tags": [
+          "oneshot"
+        ]
+      }
+    },
+    "/api/admin/files/{file_id}/download": {
+      "get": {
+        "operationId": "download_file_api_admin_files__file_id__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "file_id",
+            "required": true,
+            "schema": {
+              "title": "File Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Download File",
+        "tags": [
+          "oneshot"
+        ]
+      }
+    },
+    "/api/admin/oneshot-tokens": {
+      "get": {
+        "operationId": "list_oneshot_tokens_api_admin_oneshot_tokens_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OneShotTokenAuditItem"
+                  },
+                  "title": "Response List Oneshot Tokens Api Admin Oneshot Tokens Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "List Oneshot Tokens",
+        "tags": [
+          "oneshot"
+        ]
+      },
+      "post": {
+        "operationId": "create_oneshot_token_api_admin_oneshot_tokens_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOneShotTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateOneShotTokenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Create Oneshot Token",
+        "tags": [
+          "oneshot"
+        ]
+      }
+    },
+    "/api/oneshot/upload": {
+      "post": {
+        "operationId": "oneshot_upload_api_oneshot_upload_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_oneshot_upload_api_oneshot_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OneShotUploadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Oneshot Upload",
+        "tags": [
+          "oneshot"
+        ]
       }
     },
     "/auth/passkey/add/finish": {
