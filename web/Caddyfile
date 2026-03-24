@@ -1,0 +1,17 @@
+:80 {
+  root * /srv
+  encode zstd gzip
+
+  handle_path /api/* {
+    reverse_proxy api:8000 {
+      transport http {
+        timeouts {
+          write 0
+        }
+      }
+    }
+  }
+
+  try_files {path} /index.html
+  file_server
+}
