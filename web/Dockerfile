@@ -17,8 +17,8 @@ RUN set -eux; \
       'set -eu' \
       'export WEB_PORT="${WEB_PORT:-${PORT:-8080}}"' \
       'exec "$@"' \
-      > /usr/local/bin/flow-web-entrypoint.sh; \
-    chmod 0755 /usr/local/bin/flow-web-entrypoint.sh
+      > /usr/local/bin/oneshot-web-entrypoint.sh; \
+    chmod 0755 /usr/local/bin/oneshot-web-entrypoint.sh
 
 COPY --chown=root:root Caddyfile /etc/caddy/Caddyfile
 RUN chmod 0644 /etc/caddy/Caddyfile
@@ -27,6 +27,6 @@ ADD --chown=caddy:caddy frontend.tar.xz /srv/
 RUN chown -R caddy:caddy /data /config
 
 USER caddy
-ENTRYPOINT ["/usr/local/bin/flow-web-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/oneshot-web-entrypoint.sh"]
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
 EXPOSE 8080
