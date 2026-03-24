@@ -6,6 +6,7 @@
     reverse_proxy api:8000 {
       transport http {
         timeouts {
+          # Disable write timeout to support large file uploads.
           write 0
         }
       }

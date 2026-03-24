@@ -13,4 +13,5 @@ fi
 cd "${WEB_DIR}"
 npm ci
 npm run build
+# Use xz compression for a smaller frontend artifact.
 tar -cJf frontend.tar.xz -C dist .
