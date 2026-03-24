@@ -100,7 +100,7 @@ async def _send_oneshot_email(target_email: str, link: str) -> bool:
 
         with smtp_ctx as smtp:
             if not SETTINGS.smtp_use_ssl:
-                code, _message = smtp.starttls()
+                code, _ = smtp.starttls()
                 if code not in {220, 250}:
                     raise smtplib.SMTPException(
                         f"STARTTLS handshake failed with SMTP code {code}"
@@ -109,8 +109,12 @@ async def _send_oneshot_email(target_email: str, link: str) -> bool:
                 smtp.login(SETTINGS.smtp_username, SETTINGS.smtp_password)
             smtp.send_message(message)
         return True
-    except Exception:
-        logger.exception("Failed to dispatch OneShot email to %s", target_email)
+    except Exception as exc:
+        logger.exception(
+            "Failed to dispatch OneShot email to %s: %s",
+            target_email,
+            type(exc).__name__,
+        )
         return False
 
 

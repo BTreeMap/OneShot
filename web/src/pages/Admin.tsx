@@ -40,7 +40,7 @@ export function Admin() {
       if (!response.ok) {
         throw new Error(
           data.detail ??
-            `Failed to generate one-shot link (status: ${response.status})`,
+            `Failed to generate OneShot link (status: ${response.status})`,
         );
       }
       if (data.sent) {
@@ -54,7 +54,7 @@ export function Admin() {
       setErrorMessage(
         e instanceof Error
           ? e.message
-          : "Failed to generate one-shot link. Please try again.",
+          : "Failed to generate OneShot link. Please try again.",
       );
     } finally {
       setIsLoading(false);
