@@ -10,9 +10,11 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from app.main import app
 from app.rng import new_file_id
+from app.uploads.models import OneShotToken
 from h4ckath0n.auth.models import Device, User
 
 
@@ -75,6 +77,14 @@ def test_oneshot_module_integration_user_story(tmp_path: Path) -> None:
         assert create_response.status_code == 201
         token_id = create_response.json()["token_id"]
         assert token_id.startswith("t")
+        async def _assert_expiry_is_set() -> None:
+            async with app.state.async_session_factory() as db:
+                token = (
+                    await db.execute(select(OneShotToken).where(OneShotToken.id == token_id))
+                ).scalar_one()
+                assert token.expires_at > token.created_at
+
+        asyncio.run(_assert_expiry_is_set())
 
         upload_response = client.post(
             "/api/oneshot/upload",

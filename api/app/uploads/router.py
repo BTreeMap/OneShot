@@ -31,7 +31,6 @@ from h4ckath0n.auth.dependencies import require_admin
 from h4ckath0n.auth.models import User
 
 CHUNK_SIZE = 1024 * 1024
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
 SETTINGS = OneShotSettings()
 
 router = APIRouter()
@@ -152,7 +151,7 @@ async def create_oneshot_token(
     token = OneShotToken(
         created_by_id=admin_user.id,
         target_email=body.target_email,
-        expires_at=datetime.now(UTC) + timedelta(hours=48),
+        expires_at=datetime.now(UTC) + timedelta(hours=SETTINGS.token_expiry_hours),
     )
     db.add(token)
     await db.commit()
@@ -200,9 +199,9 @@ async def oneshot_upload(
                 if not chunk:
                     break
                 size_bytes += len(chunk)
-                if size_bytes > MAX_UPLOAD_BYTES:
+                if size_bytes > SETTINGS.max_upload_bytes:
                     raise HTTPException(
-                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                         detail="File too large",
                     )
                 out.write(chunk)

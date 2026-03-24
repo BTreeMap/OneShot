@@ -18,6 +18,10 @@ from app.uploads.models import FileMetadata, OneShotToken
 from h4ckath0n.auth.models import Device, User
 
 
+def _future_expiry() -> datetime:
+    return datetime.now(UTC) + timedelta(hours=48)
+
+
 def test_new_file_id_format() -> None:
     value = new_file_id()
     assert len(value) == 32
@@ -35,7 +39,9 @@ def test_oneshot_token_cannot_be_reused(tmp_path: Path) -> None:
                 user = User()
                 db.add(user)
                 await db.flush()
-                token = OneShotToken(id=new_oneshot_token_id(), created_by_id=user.id)
+                token = OneShotToken(
+                    id=new_oneshot_token_id(), created_by_id=user.id, expires_at=_future_expiry()
+                )
                 db.add(token)
                 await db.commit()
                 return token.id
@@ -116,8 +122,8 @@ def test_oneshot_upload_exceeding_quota_rolls_back_and_cleans_file(tmp_path: Pat
     from app.uploads import router as uploads_router
 
     uploads_router.SETTINGS.local_upload_dir = tmp_path
-    original_max_upload_bytes = uploads_router.MAX_UPLOAD_BYTES
-    uploads_router.MAX_UPLOAD_BYTES = 4
+    original_max_upload_bytes = uploads_router.SETTINGS.max_upload_bytes
+    uploads_router.SETTINGS.max_upload_bytes = 4
 
     try:
         with TestClient(app) as client:
@@ -126,7 +132,9 @@ def test_oneshot_upload_exceeding_quota_rolls_back_and_cleans_file(tmp_path: Pat
                     user = User()
                     db.add(user)
                     await db.flush()
-                    token = OneShotToken(id=new_oneshot_token_id(), created_by_id=user.id)
+                    token = OneShotToken(
+                        id=new_oneshot_token_id(), created_by_id=user.id, expires_at=_future_expiry()
+                    )
                     db.add(token)
                     await db.commit()
                     return token.id
@@ -155,7 +163,66 @@ def test_oneshot_upload_exceeding_quota_rolls_back_and_cleans_file(tmp_path: Pat
             asyncio.run(_verify())
             assert list(tmp_path.iterdir()) == []
     finally:
-        uploads_router.MAX_UPLOAD_BYTES = original_max_upload_bytes
+        uploads_router.SETTINGS.max_upload_bytes = original_max_upload_bytes
+
+
+def test_create_oneshot_token_uses_configured_expiry_hours() -> None:
+    from app.uploads import router as uploads_router
+
+    original_token_expiry_hours = uploads_router.SETTINGS.token_expiry_hours
+    uploads_router.SETTINGS.token_expiry_hours = 1
+
+    try:
+        with TestClient(app) as client:
+            async def _seed_admin_jwt() -> str:
+                async with app.state.async_session_factory() as db:
+                    admin = User(role="admin")
+                    db.add(admin)
+                    await db.flush()
+
+                    private_key = ec.generate_private_key(ec.SECP256R1())
+                    public_numbers = private_key.public_key().public_numbers()
+                    x = public_numbers.x.to_bytes(32, "big")
+                    y = public_numbers.y.to_bytes(32, "big")
+                    jwk = {
+                        "kty": "EC",
+                        "crv": "P-256",
+                        "x": _jwk_b64(x),
+                        "y": _jwk_b64(y),
+                    }
+                    device = Device(user_id=admin.id, public_key_jwk=json.dumps(jwk))
+                    db.add(device)
+                    await db.flush()
+                    token_jwt = _mint_http_jwt(admin.id, device.id, private_key)
+
+                    await db.commit()
+                    return token_jwt
+
+            admin_jwt = asyncio.run(_seed_admin_jwt())
+            before_create = datetime.now(UTC)
+            response = client.post(
+                "/api/admin/oneshot-tokens",
+                json={"target_email": None},
+                headers={"Authorization": f"Bearer {admin_jwt}"},
+            )
+            after_create = datetime.now(UTC)
+
+            assert response.status_code == 201
+            token_id = response.json()["token_id"]
+
+            async def _verify_expiry() -> None:
+                async with app.state.async_session_factory() as db:
+                    token = (
+                        await db.execute(select(OneShotToken).where(OneShotToken.id == token_id))
+                    ).scalar_one()
+                    expires_at = token.expires_at.replace(tzinfo=UTC)
+                    assert (before_create + timedelta(minutes=59)) <= expires_at <= (
+                        after_create + timedelta(minutes=61)
+                    )
+
+            asyncio.run(_verify_expiry())
+    finally:
+        uploads_router.SETTINGS.token_expiry_hours = original_token_expiry_hours
 
 
 def _jwk_b64(data: bytes) -> str:
@@ -191,7 +258,9 @@ def test_admin_file_download_requires_admin(tmp_path: Path) -> None:
                 db.add_all([uploader, non_admin])
                 await db.flush()
 
-                token = OneShotToken(id=new_oneshot_token_id(), created_by_id=uploader.id)
+                token = OneShotToken(
+                    id=new_oneshot_token_id(), created_by_id=uploader.id, expires_at=_future_expiry()
+                )
                 db.add(token)
                 await db.flush()
 
@@ -249,7 +318,9 @@ def test_admin_file_download_sets_content_disposition_filename(tmp_path: Path) -
                 db.add(admin)
                 await db.flush()
 
-                token = OneShotToken(id=new_oneshot_token_id(), created_by_id=admin.id)
+                token = OneShotToken(
+                    id=new_oneshot_token_id(), created_by_id=admin.id, expires_at=_future_expiry()
+                )
                 db.add(token)
                 await db.flush()
 

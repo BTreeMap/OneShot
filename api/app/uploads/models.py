@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -15,10 +15,6 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-def _default_token_expiry() -> datetime:
-    return datetime.now(UTC) + timedelta(hours=48)
-
-
 class OneShotToken(Base):
     __tablename__ = "oneshot_tokens"
 
@@ -29,9 +25,7 @@ class OneShotToken(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, server_default=func.now(), nullable=False
     )
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_default_token_expiry, nullable=False, index=True
-    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
 
 class FileMetadata(Base):
