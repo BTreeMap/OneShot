@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import smtplib
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from pathlib import Path
 
@@ -19,7 +19,7 @@ from fastapi import (
     status,
 )
 from pydantic import BaseModel
-from sqlalchemy import desc, select, update
+from sqlalchemy import desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import FileResponse
 from starlette.requests import Request
@@ -148,7 +148,11 @@ async def create_oneshot_token(
     db: AsyncSession = Depends(_db_dep),
     admin_user: User = require_admin(),
 ) -> CreateOneShotTokenResponse:
-    token = OneShotToken(created_by_id=admin_user.id, target_email=body.target_email)
+    token = OneShotToken(
+        created_by_id=admin_user.id,
+        target_email=body.target_email,
+        expires_at=datetime.now(UTC) + timedelta(hours=SETTINGS.token_expiry_hours),
+    )
     db.add(token)
     await db.commit()
     await db.refresh(token)
@@ -170,7 +174,11 @@ async def oneshot_upload(
 
     stmt = (
         update(OneShotToken)
-        .where(OneShotToken.id == token_id, OneShotToken.is_used == False)  # noqa: E712
+        .where(
+            OneShotToken.id == token_id,
+            OneShotToken.is_used == False,  # noqa: E712
+            OneShotToken.expires_at > func.now(),
+        )
         .values(is_used=True)
         .returning(OneShotToken.id)
     )
@@ -184,26 +192,37 @@ async def oneshot_upload(
     storage_path = SETTINGS.local_upload_dir / file_id
 
     size_bytes = 0
-    with storage_path.open("wb") as out:
-        while True:
-            chunk = await file.read(CHUNK_SIZE)
-            if not chunk:
-                break
-            size_bytes += len(chunk)
-            out.write(chunk)
+    try:
+        with storage_path.open("wb") as out:
+            while True:
+                chunk = await file.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+                size_bytes += len(chunk)
+                if size_bytes > SETTINGS.max_upload_bytes:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                        detail="File too large",
+                    )
+                out.write(chunk)
 
-    db.add(
-        FileMetadata(
-            id=file_id,
-            original_filename=file.filename or "upload.bin",
-            mime_type=file.content_type or "application/octet-stream",
-            size_bytes=size_bytes,
-            token_id=token_id,
+        db.add(
+            FileMetadata(
+                id=file_id,
+                original_filename=file.filename or "upload.bin",
+                mime_type=file.content_type or "application/octet-stream",
+                size_bytes=size_bytes,
+                token_id=token_id,
+            )
         )
-    )
-    await db.commit()
-    await file.close()
-    return OneShotUploadResponse(file_id=file_id)
+        await db.commit()
+        return OneShotUploadResponse(file_id=file_id)
+    except Exception:
+        storage_path.unlink(missing_ok=True)
+        await db.rollback()
+        raise
+    finally:
+        await file.close()
 
 
 @router.get("/admin/oneshot-tokens", response_model=list[OneShotTokenAuditItem])

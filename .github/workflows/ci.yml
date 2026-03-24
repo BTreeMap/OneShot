@@ -10,6 +10,22 @@ permissions:
 jobs:
   api-tests:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: oneshot
+          POSTGRES_PASSWORD: oneshot
+          POSTGRES_DB: oneshot_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U oneshot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      H4CKATH0N_DATABASE_URL: postgresql+asyncpg://oneshot:oneshot@localhost:5432/oneshot_test
     defaults:
       run:
         working-directory: api
@@ -47,6 +63,15 @@ jobs:
             dockerfile: ./web/Dockerfile
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        if: matrix.name == 'web'
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+      - name: Package frontend artifact
+        if: matrix.name == 'web'
+        run: bash scripts/ci/package_frontend.sh
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
