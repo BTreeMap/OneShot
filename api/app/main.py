@@ -29,7 +29,9 @@ app.include_router(uploads_router, prefix="/api", tags=["oneshot"])
 @app.middleware("http")
 async def disable_public_registration(request: Request, call_next):  # type: ignore[no-untyped-def]
     if request.url.path.startswith("/auth/passkey/register") or request.url.path == "/auth/register":
-        return JSONResponse({"detail": "Registration disabled"}, status_code=403)
+        return JSONResponse(
+            {"detail": "Public registration is disabled in OneShot mode."}, status_code=403
+        )
     return await call_next(request)
 
 

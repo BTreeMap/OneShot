@@ -9,7 +9,6 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter,
 } from "../components/Card";
 import { Alert } from "../components/Alert";
 import { Fingerprint, Loader2 } from "lucide-react";
@@ -142,17 +141,6 @@ export function Login() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col gap-4 text-center pb-8">
-          <div className="text-sm text-text-muted">
-            Don't have an account?{" "}
-            <Link
-              to="/register"
-              className="font-medium text-primary underline-offset-4 hover:underline transition-colors"
-            >
-              Sign up
-            </Link>
-          </div>
-        </CardFooter>
       </Card>
     </div>
   );

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import smtplib
+from email.message import EmailMessage
 from pathlib import Path
 
 from fastapi import (
@@ -28,8 +31,14 @@ from h4ckath0n.auth.models import User
 CHUNK_SIZE = 1024 * 1024
 LOCAL_UPLOAD_DIR = Path(os.getenv("LOCAL_UPLOAD_DIR", "./uploads"))
 ONESHOT_PUBLIC_DOMAIN = os.getenv("ONESHOT_PUBLIC_DOMAIN", "localhost:5173")
+SMTP_HOST = os.getenv("ONESHOT_SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("ONESHOT_SMTP_PORT", "587"))
+SMTP_USERNAME = os.getenv("ONESHOT_SMTP_USERNAME", "")
+SMTP_PASSWORD = os.getenv("ONESHOT_SMTP_PASSWORD", "")
+SMTP_FROM = os.getenv("ONESHOT_SMTP_FROM", "no-reply@oneshot.local")
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class CreateOneShotTokenRequest(BaseModel):
@@ -65,8 +74,31 @@ def _oneshot_link(token_id: str) -> str:
 
 
 async def _send_oneshot_email(target_email: str, link: str) -> None:
-    # Placeholder for scaffolded background email worker integration.
-    _ = (target_email, link)
+    if not SMTP_HOST:
+        logger.warning("OneShot email dispatch skipped: ONESHOT_SMTP_HOST is not configured")
+        return
+
+    message = EmailMessage()
+    message["Subject"] = "Secure OneShot Upload Link"
+    message["From"] = SMTP_FROM
+    message["To"] = target_email
+    message.set_content(
+        (
+            "You have received a secure, single-use upload link for OneShot.\n\n"
+            f"{link}\n\n"
+            "This link expires permanently after one successful upload.\n"
+            "Do not forward this message to unauthorized recipients.\n"
+        )
+    )
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as smtp:
+            smtp.starttls()
+            if SMTP_USERNAME and SMTP_PASSWORD:
+                smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
+            smtp.send_message(message)
+    except Exception:
+        logger.exception("Failed to dispatch OneShot email to %s", target_email)
 
 
 @router.post(

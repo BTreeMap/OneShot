@@ -1,10 +1,55 @@
+import { FormEvent, useState } from "react";
 import { useAuth } from "../auth";
-import { Card, CardContent, CardHeader } from "../components/Card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../components/Card";
 import { Shield, Users } from "lucide-react";
 import { Alert } from "../components/Alert";
+import { Input } from "../components/Input";
+import { Button } from "../components/Button";
 
 export function Admin() {
   const { userId, role } = useAuth();
+  const [targetEmail, setTargetEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const onGenerate = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setGeneratedLink(null);
+    setSuccessMessage(null);
+    try {
+      const response = await fetch("/api/admin/oneshot-tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_email: targetEmail || null }),
+      });
+      const data = (await response.json()) as {
+        sent?: boolean;
+        link?: string;
+      };
+      if (!response.ok) {
+        throw new Error("Failed to generate one-shot link");
+      }
+      if (data.sent) {
+        setSuccessMessage("Link successfully dispatched to user email.");
+        return;
+      }
+      if (data.link) {
+        setGeneratedLink(data.link);
+      }
+    } catch {
+      // Keep UI state unchanged on failure; generate flow can be retried.
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -39,6 +84,52 @@ export function Admin() {
             <span className="text-text-muted">Role:</span>
             <span className="font-medium text-text capitalize">{role}</span>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Generate OneShot Link</CardTitle>
+          <CardDescription>
+            Optionally provide a recipient email to dispatch a secure single-use
+            upload link.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {successMessage && <Alert variant="success">{successMessage}</Alert>}
+          <form onSubmit={onGenerate} className="space-y-4">
+            <Input
+              id="target-email"
+              label="Target Email (optional)"
+              type="email"
+              placeholder="user@example.com"
+              value={targetEmail}
+              onChange={(e) => setTargetEmail(e.target.value)}
+              disabled={isLoading}
+            />
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Generating..." : "Generate"}
+            </Button>
+          </form>
+
+          {generatedLink && (
+            <div className="space-y-3">
+              <Input
+                id="generated-link"
+                label="Generated Link"
+                type="text"
+                value={generatedLink}
+                readOnly
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => navigator.clipboard.writeText(generatedLink)}
+              >
+                Copy Link
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
