@@ -40,6 +40,9 @@ export type EchoResponse = components["schemas"]["EchoResponse"];
 /** Item body for GET /api/admin/oneshot-tokens */
 export type OneShotTokenAuditItem = components["schemas"]["OneShotTokenAuditItem"];
 
+/** Response body for GET /api/admin/stats */
+export type OneShotStatsResponse = components["schemas"]["OneShotStatsResponse"];
+
 /** Item body for GET /api/admin/files */
 export type FileAuditItem = components["schemas"]["FileAuditItem"];
 
@@ -51,6 +54,7 @@ type _AssertDemoEchoPost = paths["/demo/echo"]["post"];
 type _AssertDemoPingGet = paths["/demo/ping"]["get"];
 type _AssertDemoSseGet = paths["/demo/sse"]["get"];
 type _AssertAdminOneShotTokensGet = paths["/api/admin/oneshot-tokens"]["get"];
+type _AssertAdminStatsGet = paths["/api/admin/stats"]["get"];
 type _AssertAdminFilesGet = paths["/api/admin/files"]["get"];
 type _AssertAdminFileDownloadGet = paths["/api/admin/files/{file_id}/download"]["get"];
 
@@ -62,6 +66,7 @@ export type {
   _AssertDemoPingGet,
   _AssertDemoSseGet,
   _AssertAdminOneShotTokensGet,
+  _AssertAdminStatsGet,
   _AssertAdminFilesGet,
   _AssertAdminFileDownloadGet,
 };

@@ -26,6 +26,23 @@ function formatBytes(sizeBytes: number): string {
   return `${sizeBytes} B`;
 }
 
+function tokenStatus(tokenRow: OneShotTokenAuditItem): "Used" | "Expired" | "Active" {
+  if (tokenRow.is_used) {
+    return "Used";
+  }
+  return new Date(tokenRow.expires_at) < new Date() ? "Expired" : "Active";
+}
+
+function statusClassName(status: "Used" | "Expired" | "Active"): string {
+  if (status === "Used") {
+    return "bg-success/15 text-success";
+  }
+  if (status === "Expired") {
+    return "bg-danger/15 text-danger";
+  }
+  return "bg-primary/15 text-primary";
+}
+
 function parseDispositionFilename(contentDisposition: string | null): string | null {
   if (!contentDisposition) {
     return null;
@@ -249,21 +266,36 @@ export function Admin() {
                     <tr className="text-left text-text-muted border-b border-border">
                       <th className="py-2 pr-4">Token</th>
                       <th className="py-2 pr-4">Email</th>
-                      <th className="py-2 pr-4">Used</th>
+                      <th className="py-2 pr-4">Status</th>
                       <th className="py-2">Created</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {tokens.map((tokenRow) => (
-                      <tr key={tokenRow.id} className="border-b border-border/60">
-                        <td className="py-2 pr-4 font-mono">{tokenRow.id.slice(0, 8)}…</td>
-                        <td className="py-2 pr-4">{tokenRow.target_email ?? "—"}</td>
-                        <td className="py-2 pr-4">{tokenRow.is_used ? "Yes" : "No"}</td>
-                        <td className="py-2">
-                          {new Date(tokenRow.created_at).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
+                    {tokens.map((tokenRow) => {
+                      const status = tokenStatus(tokenRow);
+                      return (
+                        <tr key={tokenRow.id} className="border-b border-border/60">
+                          <td className="py-2 pr-4 font-mono">{tokenRow.id.slice(0, 8)}…</td>
+                          <td className="py-2 pr-4">{tokenRow.target_email ?? "—"}</td>
+                          <td className="py-2 pr-4">
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusClassName(status)}`}
+                            >
+                              {status}
+                            </span>
+                          </td>
+                          <td className="py-2">
+                            <div>{new Date(tokenRow.created_at).toLocaleString()}</div>
+                            <div
+                              className="text-xs text-text-muted"
+                              title={`Expires: ${new Date(tokenRow.expires_at).toLocaleString()}`}
+                            >
+                              Expires: {new Date(tokenRow.expires_at).toLocaleString()}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {tokens.length === 0 && (
                       <tr>
                         <td className="py-2 text-text-muted" colSpan={4}>

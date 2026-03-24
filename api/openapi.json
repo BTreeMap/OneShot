@@ -214,6 +214,11 @@
             "title": "Created At",
             "type": "string"
           },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -238,9 +243,43 @@
           "id",
           "target_email",
           "is_used",
-          "created_at"
+          "created_at",
+          "expires_at"
         ],
         "title": "OneShotTokenAuditItem",
+        "type": "object"
+      },
+      "OneShotStatsResponse": {
+        "properties": {
+          "active_tokens": {
+            "title": "Active Tokens",
+            "type": "integer"
+          },
+          "tokens_issued": {
+            "title": "Tokens Issued",
+            "type": "integer"
+          },
+          "tokens_used": {
+            "title": "Tokens Used",
+            "type": "integer"
+          },
+          "total_files": {
+            "title": "Total Files",
+            "type": "integer"
+          },
+          "total_storage_bytes": {
+            "title": "Total Storage Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_files",
+          "total_storage_bytes",
+          "tokens_issued",
+          "tokens_used",
+          "active_tokens"
+        ],
+        "title": "OneShotStatsResponse",
         "type": "object"
       },
       "OneShotUploadResponse": {
@@ -758,6 +797,32 @@
           }
         ],
         "summary": "List Uploaded Files",
+        "tags": [
+          "oneshot"
+        ]
+      }
+    },
+    "/api/admin/stats": {
+      "get": {
+        "operationId": "get_oneshot_stats_api_admin_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OneShotStatsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "DeviceJWT": []
+          }
+        ],
+        "summary": "Get Oneshot Stats",
         "tags": [
           "oneshot"
         ]

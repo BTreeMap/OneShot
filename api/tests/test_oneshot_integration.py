@@ -110,6 +110,7 @@ def test_oneshot_module_integration_user_story(tmp_path: Path) -> None:
         assert token_row["target_email"] == "recipient@example.com"
         assert token_row["is_used"] is True
         assert token_row["created_at"]
+        assert token_row["expires_at"]
 
         files_response = client.get(
             "/api/admin/files",
@@ -121,6 +122,18 @@ def test_oneshot_module_integration_user_story(tmp_path: Path) -> None:
         assert file_row["target_email"] == "recipient@example.com"
         assert file_row["size_bytes"] == len(b"classified-bytes")
         assert file_row["created_at"]
+
+        stats_response = client.get(
+            "/api/admin/stats",
+            headers={"Authorization": f"Bearer {admin_jwt}"},
+        )
+        assert stats_response.status_code == 200
+        stats = stats_response.json()
+        assert stats["total_files"] >= 1
+        assert stats["total_storage_bytes"] >= len(b"classified-bytes")
+        assert stats["tokens_issued"] >= 1
+        assert stats["tokens_used"] >= 1
+        assert stats["active_tokens"] >= 0
 
         download_response = client.get(
             f"/api/admin/files/{file_id}/download",
