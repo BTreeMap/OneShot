@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { getOrMintToken, useAuth } from "../auth";
 import type {
   FileAuditItem,
@@ -54,7 +54,7 @@ export function Admin() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const fetchAuditData = async () => {
+  const fetchAuditData = useCallback(async () => {
     setIsAuditLoading(true);
     setErrorMessage(null);
     try {
@@ -83,11 +83,11 @@ export function Admin() {
     } finally {
       setIsAuditLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void fetchAuditData();
-  }, []);
+  }, [fetchAuditData]);
 
   const onGenerate = async (e: FormEvent) => {
     e.preventDefault();
