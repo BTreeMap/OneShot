@@ -73,6 +73,91 @@ def test_oneshot_token_cannot_be_reused(tmp_path: Path) -> None:
         asyncio.run(_verify())
 
 
+def test_expired_oneshot_token_is_rejected(tmp_path: Path) -> None:
+    from app.uploads import router as uploads_router
+
+    uploads_router.SETTINGS.local_upload_dir = tmp_path
+
+    with TestClient(app) as client:
+        async def _seed() -> str:
+            async with app.state.async_session_factory() as db:
+                user = User()
+                db.add(user)
+                await db.flush()
+                token = OneShotToken(
+                    id=new_oneshot_token_id(),
+                    created_by_id=user.id,
+                    expires_at=datetime.now(UTC) - timedelta(minutes=1),
+                )
+                db.add(token)
+                await db.commit()
+                return token.id
+
+        token_id = asyncio.run(_seed())
+
+        response = client.post(
+            "/api/oneshot/upload",
+            files={"file": ("expired.txt", b"hello", "text/plain")},
+            headers={"Authorization": f"Bearer {token_id}"},
+        )
+        assert response.status_code == 401
+
+        async def _verify() -> None:
+            async with app.state.async_session_factory() as db:
+                token = (
+                    await db.execute(select(OneShotToken).where(OneShotToken.id == token_id))
+                ).scalar_one()
+                assert token.is_used is False
+
+        asyncio.run(_verify())
+
+
+def test_oneshot_upload_exceeding_quota_rolls_back_and_cleans_file(tmp_path: Path) -> None:
+    from app.uploads import router as uploads_router
+
+    uploads_router.SETTINGS.local_upload_dir = tmp_path
+    original_max_upload_bytes = uploads_router.MAX_UPLOAD_BYTES
+    uploads_router.MAX_UPLOAD_BYTES = 4
+
+    try:
+        with TestClient(app) as client:
+            async def _seed() -> str:
+                async with app.state.async_session_factory() as db:
+                    user = User()
+                    db.add(user)
+                    await db.flush()
+                    token = OneShotToken(id=new_oneshot_token_id(), created_by_id=user.id)
+                    db.add(token)
+                    await db.commit()
+                    return token.id
+
+            token_id = asyncio.run(_seed())
+
+            response = client.post(
+                "/api/oneshot/upload",
+                files={"file": ("big.bin", b"12345", "application/octet-stream")},
+                headers={"Authorization": f"Bearer {token_id}"},
+            )
+            assert response.status_code == 413
+
+            async def _verify() -> None:
+                async with app.state.async_session_factory() as db:
+                    token = (
+                        await db.execute(select(OneShotToken).where(OneShotToken.id == token_id))
+                    ).scalar_one()
+                    assert token.is_used is False
+
+                    metadata = (
+                        await db.execute(select(FileMetadata).where(FileMetadata.token_id == token_id))
+                    ).scalar_one_or_none()
+                    assert metadata is None
+
+            asyncio.run(_verify())
+            assert list(tmp_path.iterdir()) == []
+    finally:
+        uploads_router.MAX_UPLOAD_BYTES = original_max_upload_bytes
+
+
 def _jwk_b64(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode().rstrip("=")
 
@@ -209,4 +294,3 @@ def test_admin_file_download_sets_content_disposition_filename(tmp_path: Path) -
         assert response.status_code == 200
         assert "attachment;" in response.headers["content-disposition"]
         assert 'filename="evidence-report.pdf"' in response.headers["content-disposition"]
-
