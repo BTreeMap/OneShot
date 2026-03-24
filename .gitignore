@@ -1,0 +1,40 @@
+# H4ckath0n Local State
+.h4ckath0n_storage/
+.h4ckath0n_email_outbox/
+
+# Environment Variables
+.env
+
+# Database Files
+*.db
+*.sqlite
+*.sqlite3
+
+# Python Cache & Runtime
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python Tooling
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Python Build & Distribution
+dist/
+build/
+*.egg-info/
+.eggs/
+*.egg
+
+# Python Virtual Environment
+.venv/
+
+# Node & Frontend
+node_modules/
+*.tsbuildinfo
+test-results/
+playwright-report/
+
+# Logs
+*.log
