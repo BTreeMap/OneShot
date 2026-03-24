@@ -1,4 +1,4 @@
-:80 {
+{$WEB_PORT:8080} {
   root * /srv
   encode zstd gzip
 

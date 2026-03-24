@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
 from datetime import UTC, datetime, timedelta
@@ -16,7 +15,7 @@ from app.main import app
 from app.rng import new_file_id, new_oneshot_token_id
 from app.uploads.models import FileMetadata, OneShotToken
 from h4ckath0n.auth.models import Device, User
-
+from tests.helpers import run_in_app_loop
 
 def _future_expiry() -> datetime:
     return datetime.now(UTC) + timedelta(hours=48)
@@ -46,7 +45,7 @@ def test_oneshot_token_cannot_be_reused(tmp_path: Path) -> None:
                 await db.commit()
                 return token.id
 
-        token_id = asyncio.run(_seed())
+        token_id = run_in_app_loop(client, _seed)
 
         files = {"file": ("test.txt", b"hello", "text/plain")}
         first = client.post(
@@ -76,7 +75,7 @@ def test_oneshot_token_cannot_be_reused(tmp_path: Path) -> None:
                 assert row.original_filename == "test.txt"
                 assert row.size_bytes == 5
 
-        asyncio.run(_verify())
+        run_in_app_loop(client, _verify)
 
 
 def test_expired_oneshot_token_is_rejected(tmp_path: Path) -> None:
@@ -99,7 +98,7 @@ def test_expired_oneshot_token_is_rejected(tmp_path: Path) -> None:
                 await db.commit()
                 return token.id
 
-        token_id = asyncio.run(_seed())
+        token_id = run_in_app_loop(client, _seed)
 
         response = client.post(
             "/api/oneshot/upload",
@@ -115,7 +114,7 @@ def test_expired_oneshot_token_is_rejected(tmp_path: Path) -> None:
                 ).scalar_one()
                 assert token.is_used is False
 
-        asyncio.run(_verify())
+        run_in_app_loop(client, _verify)
 
 
 def test_oneshot_upload_exceeding_quota_rolls_back_and_cleans_file(tmp_path: Path) -> None:
@@ -139,7 +138,7 @@ def test_oneshot_upload_exceeding_quota_rolls_back_and_cleans_file(tmp_path: Pat
                     await db.commit()
                     return token.id
 
-            token_id = asyncio.run(_seed())
+            token_id = run_in_app_loop(client, _seed)
 
             response = client.post(
                 "/api/oneshot/upload",
@@ -160,7 +159,7 @@ def test_oneshot_upload_exceeding_quota_rolls_back_and_cleans_file(tmp_path: Pat
                     ).scalar_one_or_none()
                     assert metadata is None
 
-            asyncio.run(_verify())
+            run_in_app_loop(client, _verify)
             assert list(tmp_path.iterdir()) == []
     finally:
         uploads_router.SETTINGS.max_upload_bytes = original_max_upload_bytes
@@ -198,7 +197,7 @@ def test_create_oneshot_token_uses_configured_expiry_hours() -> None:
                     await db.commit()
                     return token_jwt
 
-            admin_jwt = asyncio.run(_seed_admin_jwt())
+            admin_jwt = run_in_app_loop(client, _seed_admin_jwt)
             before_create = datetime.now(UTC)
             response = client.post(
                 "/api/admin/oneshot-tokens",
@@ -220,7 +219,7 @@ def test_create_oneshot_token_uses_configured_expiry_hours() -> None:
                         after_create + timedelta(minutes=61)
                     )
 
-            asyncio.run(_verify_expiry())
+            run_in_app_loop(client, _verify_expiry)
     finally:
         uploads_router.SETTINGS.token_expiry_hours = original_token_expiry_hours
 
@@ -296,7 +295,7 @@ def test_admin_file_download_requires_admin(tmp_path: Path) -> None:
                 await db.commit()
                 return file_id, non_admin.id, non_admin_jwt
 
-        file_id, _, non_admin_jwt = asyncio.run(_seed())
+        file_id, _, non_admin_jwt = run_in_app_loop(client, _seed)
         (tmp_path / file_id).write_bytes(b"hello")
 
         response = client.get(
@@ -354,7 +353,7 @@ def test_admin_file_download_sets_content_disposition_filename(tmp_path: Path) -
                 await db.commit()
                 return file_id, token_jwt
 
-        file_id, token_jwt = asyncio.run(_seed())
+        file_id, token_jwt = run_in_app_loop(client, _seed)
         (tmp_path / file_id).write_bytes(b"hello")
 
         response = client.get(
