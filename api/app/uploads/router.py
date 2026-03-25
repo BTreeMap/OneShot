@@ -51,6 +51,10 @@ class OneShotUploadResponse(BaseModel):
     file_id: str
 
 
+class OneShotTokenStatusResponse(BaseModel):
+    valid: bool
+
+
 class OneShotTokenAuditItem(BaseModel):
     id: str
     target_email: str | None
@@ -232,6 +236,24 @@ async def oneshot_upload(
         raise
     finally:
         await file.close()
+
+
+@router.get("/oneshot/token-status", response_model=OneShotTokenStatusResponse)
+async def oneshot_token_status(
+    authorization: str | None = Header(default=None),
+    db: AsyncSession = Depends(_db_dep),
+) -> OneShotTokenStatusResponse:
+    token_id = _extract_bearer_token(authorization)
+    valid = (
+        await db.execute(
+            select(func.count(OneShotToken.id)).where(
+                OneShotToken.id == token_id,
+                OneShotToken.is_used.is_(False),
+                OneShotToken.expires_at > func.now(),
+            )
+        )
+    ).scalar_one()
+    return OneShotTokenStatusResponse(valid=bool(valid))
 
 
 @router.get("/admin/oneshot-tokens", response_model=list[OneShotTokenAuditItem])

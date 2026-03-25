@@ -200,7 +200,7 @@ export function Admin() {
               onChange={(e) => setTargetEmail(e.target.value)}
               disabled={isLoading}
             />
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading} data-testid="admin-generate-link">
               {isLoading ? "Generating..." : "Generate"}
             </Button>
           </form>
@@ -213,6 +213,7 @@ export function Admin() {
                 type="text"
                 value={generatedLink}
                 readOnly
+                data-testid="admin-generated-link-input"
               />
               <Button
                 type="button"
@@ -238,6 +239,7 @@ export function Admin() {
           type="button"
           variant={activeSection === "audit" ? "primary" : "secondary"}
           onClick={() => setActiveSection("audit")}
+          data-testid="admin-audit-logs-tab"
         >
           Audit Logs
         </Button>
@@ -330,6 +332,7 @@ export function Admin() {
                             type="button"
                             variant="secondary"
                             size="sm"
+                            data-testid={`admin-download-${fileRow.id}`}
                             onClick={async () => {
                               try {
                                 const token = await getOrMintToken("http");
