@@ -5,11 +5,12 @@ import contextlib
 import json
 from datetime import UTC, datetime
 
-from fastapi import Request, WebSocket, WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import JSONResponse
 
+from app.config import OneShotSettings
 from app.middleware import add_csp_middleware
 from app.uploads import models as _uploads_models  # noqa: F401
 from app.uploads.router import router as uploads_router
@@ -24,15 +25,19 @@ from h4ckath0n.realtime import (
 app = create_app()
 add_csp_middleware(app)
 app.include_router(uploads_router, prefix="/api", tags=["oneshot"])
+SETTINGS = OneShotSettings()
+DISABLED_REGISTRATION_PATHS = {
+    "/auth/register",
+    "/auth/passkey/register/start",
+    "/auth/passkey/register/finish",
+}
 
-
-@app.middleware("http")
-async def disable_public_registration(request: Request, call_next):  # type: ignore[no-untyped-def]
-    if request.url.path.startswith("/auth/passkey/register") or request.url.path == "/auth/register":
-        return JSONResponse(
-            {"detail": "Public registration is disabled in OneShot mode."}, status_code=403
-        )
-    return await call_next(request)
+if not SETTINGS.allow_passkey_registration_for_e2e:
+    app.router.routes = [
+        route
+        for route in app.router.routes
+        if getattr(route, "path", None) not in DISABLED_REGISTRATION_PATHS
+    ]
 
 
 class HealthzResponse(BaseModel):

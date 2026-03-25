@@ -30,7 +30,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `uv --project "${uvProject}" run --locked python -m uvicorn app.main:app --host 127.0.0.1 --port 8000`,
+      command: `uv --project "${uvProject}" run --locked uvicorn app.main:app --host 127.0.0.1 --port 8000`,
       cwd: apiDir,
       url: "http://127.0.0.1:8000/healthz",
       reuseExistingServer: !process.env.CI,
@@ -42,7 +42,7 @@ export default defineConfig({
       },
     },
     {
-      command: "npx vite --host 127.0.0.1 --port 5173",
+      command: "npm run dev -- --host 127.0.0.1 --port 5173",
       url: "http://127.0.0.1:5173",
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,

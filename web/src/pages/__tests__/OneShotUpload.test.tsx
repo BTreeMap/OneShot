@@ -9,16 +9,24 @@ describe("OneShotUpload", () => {
   });
 
   it("extracts token from hash and sends Authorization bearer header", async () => {
-    const mockFetch = vi.spyOn(window, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ file_id: "f123" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
+    const mockFetch = vi
+      .spyOn(window, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ valid: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ file_id: "f123" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
 
     render(<OneShotUpload />);
 
-    const input = screen.getByLabelText("File") as HTMLInputElement;
+    const input = await screen.findByLabelText("Upload File");
     const file = new File(["hello"], "hello.txt", { type: "text/plain" });
     fireEvent.change(input, { target: { files: [file] } });
     fireEvent.click(screen.getByRole("button", { name: "Upload" }));
@@ -27,7 +35,7 @@ describe("OneShotUpload", () => {
       expect(mockFetch).toHaveBeenCalled();
     });
 
-    const [, init] = mockFetch.mock.calls[0]!;
+    const [, init] = mockFetch.mock.calls[1]!;
     const headers = (init?.headers ?? {}) as Record<string, string>;
     expect(headers.Authorization).toBe("Bearer t12345");
   });

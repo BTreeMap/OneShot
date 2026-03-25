@@ -21,6 +21,7 @@ class OneShotSettings(BaseSettings):
     public_domain: str = "localhost:5173"
     token_expiry_hours: int = 48
     max_upload_bytes: int = 5 * 1024 * 1024 * 1024
+    allow_passkey_registration_for_e2e: bool = False
 
     smtp_host: str = ""
     smtp_port: int = 587

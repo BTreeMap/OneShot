@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/Card";
 import { Input } from "../components/Input";
@@ -6,6 +6,7 @@ import { Alert } from "../components/Alert";
 
 type UploadState =
   | "IDLE"
+  | "VALIDATING"
   | "UPLOADING"
   | "SUCCESS"
   | "ERROR_INVALID_TOKEN"
@@ -23,7 +24,38 @@ function tokenFromHash(): string | null {
 export function OneShotUpload() {
   const token = useMemo(() => tokenFromHash(), []);
   const [file, setFile] = useState<File | null>(null);
-  const [uploadState, setUploadState] = useState<UploadState>("IDLE");
+  const [uploadState, setUploadState] = useState<UploadState>(
+    token ? "VALIDATING" : "ERROR_INVALID_TOKEN",
+  );
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    let isMounted = true;
+    const validateToken = async () => {
+      try {
+        const res = await fetch("/api/oneshot/token-status", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!res.ok) {
+          if (isMounted) setUploadState("ERROR_INVALID_TOKEN");
+          return;
+        }
+        const data = (await res.json()) as { valid?: boolean };
+        if (!isMounted) return;
+        setUploadState(data.valid ? "IDLE" : "ERROR_INVALID_TOKEN");
+      } catch {
+        if (isMounted) setUploadState("ERROR_INVALID_TOKEN");
+      }
+    };
+    void validateToken();
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,7 +100,10 @@ export function OneShotUpload() {
         </CardHeader>
         <CardContent>
           {uploadState === "ERROR_INVALID_TOKEN" && (
-            <Alert variant="error">Link Expired. This one-shot link is invalid or already used.</Alert>
+            <Alert variant="error">
+              Link Expired or Invalid. This one-shot link is invalid or already
+              used.
+            </Alert>
           )}
           {uploadState === "ERROR_UPLOAD_FAILED" && (
             <Alert variant="error">Upload failed. Please try again with a new link.</Alert>
@@ -81,15 +116,30 @@ export function OneShotUpload() {
             <Input
               id="oneshot-file"
               type="file"
-              label="File"
+              label="Upload File"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              disabled={uploadState === "UPLOADING" || uploadState === "SUCCESS"}
+              disabled={
+                uploadState === "VALIDATING" ||
+                uploadState === "UPLOADING" ||
+                uploadState === "SUCCESS" ||
+                uploadState === "ERROR_INVALID_TOKEN"
+              }
             />
             <Button
               type="submit"
-              disabled={!file || uploadState === "UPLOADING" || uploadState === "SUCCESS"}
+              disabled={
+                !file ||
+                uploadState === "VALIDATING" ||
+                uploadState === "UPLOADING" ||
+                uploadState === "SUCCESS" ||
+                uploadState === "ERROR_INVALID_TOKEN"
+              }
             >
-              {uploadState === "UPLOADING" ? "Uploading..." : "Upload"}
+              {uploadState === "VALIDATING"
+                ? "Validating link..."
+                : uploadState === "UPLOADING"
+                  ? "Uploading..."
+                  : "Upload"}
             </Button>
           </form>
         </CardContent>
