@@ -26,13 +26,15 @@ app = create_app()
 add_csp_middleware(app)
 app.include_router(uploads_router, prefix="/api", tags=["oneshot"])
 SETTINGS = OneShotSettings()
+PASSKEY_REGISTER_PATHS = {"/auth/passkey/register/start", "/auth/passkey/register/finish"}
 
 
 @app.middleware("http")
 async def disable_public_registration(request: Request, call_next):  # type: ignore[no-untyped-def]
-    if request.url.path.startswith("/auth/passkey/register") and SETTINGS.allow_passkey_registration_for_e2e:
+    is_passkey_register = request.url.path in PASSKEY_REGISTER_PATHS
+    if is_passkey_register and SETTINGS.allow_passkey_registration_for_e2e:
         return await call_next(request)
-    if request.url.path.startswith("/auth/passkey/register") or request.url.path == "/auth/register":
+    if is_passkey_register or request.url.path == "/auth/register":
         return JSONResponse(
             {"detail": "Public registration is disabled in OneShot mode."}, status_code=403
         )

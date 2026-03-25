@@ -10,6 +10,10 @@ const execFileAsync = promisify(execFile);
 type AdminIdentity = { userId: string; deviceId: string; token: string };
 const API_BASE_URL = "http://127.0.0.1:8000";
 
+function authHeader(token: string): { Authorization: string } {
+  return { Authorization: `Bearer ${token}` };
+}
+
 function toLocalOneShotUrl(issuedLink: string, baseURL: string): string {
   const parsed = new URL(issuedLink);
   const token = new URLSearchParams(parsed.hash.replace(/^#/, "")).get("token");
@@ -161,7 +165,7 @@ async function generateOneShotLink(
   const response = await page.request.post(
     `${API_BASE_URL}/api/admin/oneshot-tokens`,
     {
-      headers: { Authorization: "Bearer " + adminToken },
+      headers: authHeader(adminToken),
       data: {},
     },
   );
@@ -172,9 +176,10 @@ async function generateOneShotLink(
   }
   const payload = (await response.json()) as { upload_url?: string; token_id?: string };
   const tokenId = payload.token_id;
-  const issuedLink =
-    payload.upload_url ??
-    (tokenId ? `https://placeholder.local/oneshot#token=${tokenId}` : `${baseURL}/oneshot#token=`);
+  if (!payload.upload_url && !tokenId) {
+    throw new Error(`oneshot token response missing link/token_id: ${JSON.stringify(payload)}`);
+  }
+  const issuedLink = payload.upload_url ?? `https://placeholder.local/oneshot#token=${tokenId}`;
   return toLocalOneShotUrl(issuedLink, baseURL);
 }
 
@@ -192,7 +197,7 @@ test.describe("OneShot E2E lifecycle", () => {
     const fileContent = "oneshot e2e dummy payload";
 
     const uploadResponse = await page.request.post(`${API_BASE_URL}/api/oneshot/upload`, {
-      headers: { Authorization: "Bearer " + uploadToken },
+      headers: authHeader(uploadToken),
       multipart: {
         file: {
           name: fileName,
@@ -204,7 +209,7 @@ test.describe("OneShot E2E lifecycle", () => {
     expect(uploadResponse.ok()).toBeTruthy();
 
     const filesResponse = await page.request.get(`${API_BASE_URL}/api/admin/files`, {
-      headers: { Authorization: "Bearer " + admin.token },
+      headers: authHeader(admin.token),
     });
     expect(filesResponse.ok()).toBeTruthy();
     const files = (await filesResponse.json()) as Array<{
@@ -213,12 +218,12 @@ test.describe("OneShot E2E lifecycle", () => {
     }>;
     const targetFile = files.find((f) => f.original_filename === fileName);
     expect(targetFile).toBeTruthy();
-    const targetFileId = targetFile ? targetFile.id : "";
+    const targetFileId = targetFile!.id;
 
     const downloadResponse = await page.request.get(
       `${API_BASE_URL}/api/admin/files/${targetFileId}/download`,
       {
-        headers: { Authorization: "Bearer " + admin.token },
+        headers: authHeader(admin.token),
       },
     );
     expect(downloadResponse.ok()).toBeTruthy();
@@ -237,7 +242,7 @@ test.describe("OneShot E2E lifecycle", () => {
     const uploadToken = tokenFromOneShotUrl(oneShotUrl);
 
     const firstUploadResponse = await page.request.post(`${API_BASE_URL}/api/oneshot/upload`, {
-      headers: { Authorization: "Bearer " + uploadToken },
+      headers: authHeader(uploadToken),
       multipart: {
         file: {
           name: "oneshot-first-use.txt",
