@@ -54,7 +54,7 @@ jobs:
     env:
       H4CKATH0N_DATABASE_URL: postgresql+asyncpg://oneshot:oneshot@localhost:5432/oneshot_test
       H4CKATH0N_PASSWORD_AUTH_ENABLED: "false"
-      H4CKATH0N_FIRST_USER_IS_ADMIN: "true"
+      ONESHOT_ALLOW_PASSKEY_REGISTRATION_FOR_E2E: "true"
     defaults:
       run:
         working-directory: web
