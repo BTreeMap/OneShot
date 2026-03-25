@@ -30,7 +30,6 @@ export function OneShotUpload() {
 
   useEffect(() => {
     if (!token) {
-      setUploadState("ERROR_INVALID_TOKEN");
       return;
     }
     let isMounted = true;
