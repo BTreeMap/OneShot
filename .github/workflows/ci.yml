@@ -53,8 +53,8 @@ jobs:
           --health-retries=10
     env:
       H4CKATH0N_DATABASE_URL: postgresql+asyncpg://oneshot:oneshot@localhost:5432/oneshot_test
-      E2E_ADMIN_USERNAME: admin
-      E2E_ADMIN_PASSWORD: admin
+      H4CKATH0N_PASSWORD_AUTH_ENABLED: "false"
+      H4CKATH0N_FIRST_USER_IS_ADMIN: "true"
     defaults:
       run:
         working-directory: web
