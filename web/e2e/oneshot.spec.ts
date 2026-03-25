@@ -1,8 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { promises as fs } from "node:fs";
 
-const ADMIN_USERNAME = process.env.E2E_ADMIN_USERNAME ?? "admin";
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "admin";
+const ADMIN_USERNAME = process.env.E2E_ADMIN_USERNAME;
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD;
 
 function toLocalOneShotUrl(issuedLink: string, baseURL: string): string {
   const parsed = new URL(issuedLink);
@@ -13,7 +13,12 @@ function toLocalOneShotUrl(issuedLink: string, baseURL: string): string {
   return new URL(`/oneshot#token=${token}`, baseURL).toString();
 }
 
-async function loginAsAdmin(page: import("@playwright/test").Page): Promise<void> {
+async function loginAsAdmin(page: Page): Promise<void> {
+  if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+    throw new Error(
+      "E2E admin credentials are required: set E2E_ADMIN_USERNAME and E2E_ADMIN_PASSWORD.",
+    );
+  }
   await page.goto("/login");
   await page.getByTestId("login-username-input").fill(ADMIN_USERNAME);
   await page.getByTestId("login-password-input").fill(ADMIN_PASSWORD);
@@ -24,7 +29,7 @@ async function loginAsAdmin(page: import("@playwright/test").Page): Promise<void
 }
 
 async function generateOneShotLink(
-  page: import("@playwright/test").Page,
+  page: Page,
   baseURL: string,
 ): Promise<string> {
   await page.getByTestId("admin-generate-link").click();
