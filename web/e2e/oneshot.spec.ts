@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { execFile } from "node:child_process";
+import { resolve } from "node:path";
 import { promisify } from "node:util";
 import {
   addVirtualAuthenticator,
@@ -9,6 +10,7 @@ import {
 const execFileAsync = promisify(execFile);
 type AdminIdentity = { userId: string; deviceId: string; token: string };
 const API_BASE_URL = "http://127.0.0.1:8000";
+const API_PROJECT_PATH = resolve(process.cwd(), "../api");
 
 function authHeader(token: string): { Authorization: string } {
   return { Authorization: `Bearer ${token}` };
@@ -112,7 +114,7 @@ async function promoteUserToAdmin(userId: string): Promise<void> {
     "uv",
     [
       "--project",
-      "../api",
+      API_PROJECT_PATH,
       "run",
       "h4ckath0n",
       "users",
@@ -129,7 +131,7 @@ async function promoteUserToAdmin(userId: string): Promise<void> {
     "uv",
     [
       "--project",
-      "../api",
+      API_PROJECT_PATH,
       "run",
       "h4ckath0n",
       "users",
@@ -175,11 +177,10 @@ async function generateOneShotLink(
     );
   }
   const payload = (await response.json()) as { upload_url?: string; token_id?: string };
-  const tokenId = payload.token_id;
-  if (!payload.upload_url && !tokenId) {
+  if (!payload.upload_url && !payload.token_id) {
     throw new Error(`oneshot token response missing link/token_id: ${JSON.stringify(payload)}`);
   }
-  const issuedLink = payload.upload_url ?? `https://placeholder.local/oneshot#token=${tokenId}`;
+  const issuedLink = payload.upload_url ?? new URL(`/oneshot#token=${payload.token_id}`, baseURL).toString();
   return toLocalOneShotUrl(issuedLink, baseURL);
 }
 
